@@ -2,14 +2,14 @@ import torch
 from UNet import UNet
 from pathlib import Path
 from torch import optim
-from dataset import Refuge2, Resize2_640
+from dataset import Refuge2, Resize2_640, RandomRotation, RandomFlip
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from torch.autograd import Variable
 import torch.nn as nn
 from utils import DiceLoss
 from torchvision.transforms import Compose
-from utils import counting_correct
+from utils import counting_correct, DataLoaderX
 
 
 def load_model(base_lr=1e-3, pretrained=None, cuda=False):
@@ -31,7 +31,7 @@ def load_model(base_lr=1e-3, pretrained=None, cuda=False):
 
 
 def test(data, model, cuda):
-    dataloader = DataLoader(data, shuffle=False, num_workers=1)
+    dataloader = DataLoaderX(data, shuffle=False, num_workers=1)
     iterator = tqdm(dataloader)
     correct = 0
     res = []
@@ -45,18 +45,20 @@ def test(data, model, cuda):
     return correct / (640**2), res
 
 
-def core_train(data_paths, gt_labels, gt_segmentations, batch_size=1, cuda=False):
-    # data_paths = [i for i in range(400)]
-    # gt_labels = [1 for _ in range(40)] + [0 for _ in range(360)]
-    # gt_segmentations = []
+def core_train(data, gt_segmentations, batch_size=1, cuda=False):
     transform = Compose(
-        [Resize2_640()]
+        [
+            RandomRotation(),
+            RandomFlip(),
+            Resize2_640()
+        ]
     )
     epoch = 0
     best_PA = 0.
     model, optimizer, lr_scheduler = load_model(cuda=cuda)
-    train_dataset = Refuge2(data_path=data_paths, labels=gt_labels, segmentations=gt_segmentations,
+    train_dataset = Refuge2(data=data, labels=None, segmentations=gt_segmentations,
                             transform=transform)
+    res = None
     while True:
         if epoch > 0 and epoch % 2 == 0:
             model.eval()
@@ -66,7 +68,7 @@ def core_train(data_paths, gt_labels, gt_segmentations, batch_size=1, cuda=False
             model.train()
         if epoch >= 10:
             break
-        dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=1)
+        dataloader = DataLoaderX(train_dataset, batch_size=batch_size, shuffle=True, num_workers=1)
         iterator = tqdm(dataloader)
         for sample in iterator:
             img, gt_label, gt_segmentation = sample

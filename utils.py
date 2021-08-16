@@ -3,6 +3,8 @@ from torchvision.transforms import CenterCrop
 import numpy as np
 from skimage.transform import rotate
 import cv2
+from prefetch_generator import BackgroundGenerator
+from torch.utils.data import DataLoader
 
 
 def DiceLoss(predict, gt):
@@ -21,16 +23,15 @@ def counting_correct(predict, gt):
 
 
 def RegionCrop(origin_img, localization, size=(224, 224)):
-    C, H, W = localization.shape
+    H, W = localization.shape
     left = W
     right = 0
     top = H
     bottom = 0
 
-    has_target = localization.any(dim=0)
     for row in range(W):
         for col in range(H):
-            if has_target[row, col]:
+            if localization[row, col] < 255:  # if the background is white, otherwise set this to 0
                 left = min(left, col)
                 right = max(right, col)
                 top = min(top, row)
@@ -57,9 +58,14 @@ def inversePolarTransformation(u, v, phai=0, size=224):
 def transformation(cropped_imgs):
     polar_imgs = []
     for img in cropped_imgs:
-        polar_imgs.append(rotate(cv2.linearPolar(cropped_imgs, (400, 400), 400, cv2.WARP_FILL_OUTLIERS), -90))
+        polar_imgs.append(rotate(cv2.linearPolar(img, (400, 400), 400, cv2.WARP_FILL_OUTLIERS), -90))
     polar_imgs = np.array(polar_imgs)
     return polar_imgs
+
+
+class DataLoaderX(DataLoader):
+    def __iter__(self):
+        return BackgroundGenerator(super().__iter__())
 
 
 if __name__ == "__main__":

@@ -2,27 +2,13 @@ import torch
 from core_train import core_train
 from fc_classification import FCNet
 from torch import optim
-from dataset import Refuge2, Resize2_640
+from dataset import Refuge2, Resize2_640, RandomRotation, RandomFlip
 from torchvision.transforms import Compose
-from torch.utils.data import DataLoader
 from tqdm import tqdm
 from torch.autograd import Variable
 import torch.nn as nn
 from dedicated_Resnet50 import ResNet50_Mod
-import numpy as np
-import cv2
-
-
-def data_preload(data_paths, gt_labels, gt_segmentations, transform=None, isArray=True, isTrain=True):
-    if isArray:
-        dataset = Refuge2(data_paths, gt_labels, gt_segmentations, transform, isTrain)
-    else:
-        data = []
-        for path in data_paths:
-            data.append(cv2.imread(path.strip('\n')))
-        data = np.array(data)
-        dataset = Refuge2(data, gt_labels, gt_segmentations, transform, isTrain)
-    return dataset
+from utils import DataLoaderX
 
 
 def getModel(base_lr=1e-3, cuda=False):
@@ -44,12 +30,12 @@ def getResNet(base_lr=1e-3, cuda=False):
     return model, optimizer, lr_scheduler
 
 
-def test(data, model, cuda):
-    dataloader = DataLoader(data, shuffle=False, num_workers=1)
+def test(data, model, batch_size, cuda):
+    dataloader = DataLoaderX(data, batch_size=batch_size, shuffle=False, num_workers=1)
     iterator = tqdm(dataloader)
     TP = FP = TN = FN = 0.
     for sample in iterator:
-        img, gt_label, gt_segmentation = sample
+        img, gt_label, _ = sample
         if cuda:
             img = Variable(img).cuda
         classification = model(img)
@@ -70,28 +56,32 @@ def test(data, model, cuda):
     return BAcc
 
 
-def train_fcnet(data_paths, gt_labels, gt_segmentations, cuda):
-    res = core_train(data_paths, gt_labels, gt_segmentations)
+def train_fcnet(data, gt_labels, gt_segmentations, batch_size=1, cuda=False):
+    res = core_train(data, None, gt_segmentations, cuda=cuda)
     model, optimizer, lr_scheduler = getModel(cuda=cuda)
     transform = Compose(
-        [Resize2_640()]
+        [
+            RandomRotation(),
+            RandomFlip(),
+            Resize2_640()
+        ]
     )
-    dataset = data_preload(data_paths, gt_labels, gt_segmentations, transform=transform, isArray=False)
+    dataset = Refuge2(data, gt_labels, None, transform=transform)
     epoch = 0
     best_BAcc = 0.
     while True:
         if epoch > 0 and epoch % 2 == 0:
             model.eval()
-            BAcc = test(dataset, model, cuda)
+            BAcc = test(dataset, model, batch_size, cuda)
             best_BAcc = max(best_BAcc, BAcc)
             model.train()
         if epoch >= 10:
             break
-        dataloader = DataLoader(dataset, shuffle=True, num_workers=1)
+        dataloader = DataLoaderX(dataset, batch_size=batch_size, shuffle=True, num_workers=1)
         iterator = tqdm(dataloader)
         for sample in iterator:
             optimizer.zero_grad()
-            img, gt_label, gt_segmentation = sample
+            img, gt_label, _ = sample
             if cuda:
                 img = Variable(img).cuda()
                 classification = model(img).cpu()
@@ -106,24 +96,30 @@ def train_fcnet(data_paths, gt_labels, gt_segmentations, cuda):
     return res, model
 
 
-def train_resnet(data_paths, gt_labels, gt_segmentations, cuda, transform=None, isArray=True):
+def train_resnet(data, gt_labels, batch_size=1, cuda=False):
     model, optimizer, lr_scheduler = getResNet(cuda=cuda)
-    dataset = data_preload(data_paths, gt_labels, gt_segmentations, transform, isArray)
+    transform = Compose(
+        [
+            RandomRotation(),
+            RandomFlip()
+        ]
+    )
+    dataset = Refuge2(data, gt_labels, segmentations=None, transform=transform)
     epoch = 0
     best_BAcc = 0.
     while True:
         if epoch > 0 and epoch % 2 == 0:
             model.eval()
-            BAcc = test(dataset, model, cuda)
+            BAcc = test(dataset, model, batch_size=batch_size, cuda=cuda)
             best_BAcc = max(best_BAcc, BAcc)
             model.train()
         if epoch >= 10:
             break
-        dataloader = DataLoader(dataset, shuffle=True, num_workers=1)
+        dataloader = DataLoaderX(dataset, batch_size=batch_size, shuffle=True, num_workers=1)
         iterator = tqdm(dataloader)
         for sample in iterator:
             optimizer.zero_grad()
-            img, gt_label, gt_segmentation = sample
+            img, gt_label, _ = sample
             if cuda:
                 img = Variable(img).cuda()
                 classification = model(img).cpu()
