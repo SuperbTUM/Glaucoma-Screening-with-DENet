@@ -8,10 +8,10 @@ from tqdm import tqdm
 from torch.autograd import Variable
 import torch.nn as nn
 from dedicated_Resnet50 import ResNet50_Mod
-from utils import DataLoaderX
+from utils import DataLoaderX, collate_fn
 
 
-def getModel(base_lr=1e-3, cuda=False):
+def getModel(base_lr=1e-4, cuda=False):
     model = FCNet()
     if cuda:
         model = model.cuda()
@@ -21,7 +21,7 @@ def getModel(base_lr=1e-3, cuda=False):
     return model, optimizer, lr_scheduler
 
 
-def getResNet(base_lr=1e-3, cuda=False):
+def getResNet(base_lr=1e-4, cuda=False):
     model = ResNet50_Mod()
     if cuda:
         model = model.cuda()
@@ -31,11 +31,11 @@ def getResNet(base_lr=1e-3, cuda=False):
 
 
 def test(data, model, batch_size, cuda):
-    dataloader = DataLoaderX(data, batch_size=batch_size, shuffle=False, num_workers=1)
+    dataloader = DataLoaderX(data, batch_size=batch_size, shuffle=False, num_workers=1, collate_fn=collate_fn)
     iterator = tqdm(dataloader)
     TP = FP = TN = FN = 0.
     for sample in iterator:
-        img, gt_label, _ = sample
+        img, gt_label = sample
         if cuda:
             img = Variable(img).cuda
         classification = model(img)
@@ -77,11 +77,11 @@ def train_fcnet(data, gt_labels, gt_segmentations, batch_size=1, cuda=False):
             model.train()
         if epoch >= 10:
             break
-        dataloader = DataLoaderX(dataset, batch_size=batch_size, shuffle=True, num_workers=1)
+        dataloader = DataLoaderX(dataset, batch_size=batch_size, shuffle=True, num_workers=1, collate_fn=collate_fn)
         iterator = tqdm(dataloader)
         for sample in iterator:
             optimizer.zero_grad()
-            img, gt_label, _ = sample
+            img, gt_label = sample
             if cuda:
                 img = Variable(img).cuda()
                 classification = model(img).cpu()
@@ -97,6 +97,7 @@ def train_fcnet(data, gt_labels, gt_segmentations, batch_size=1, cuda=False):
 
 
 def train_resnet(data, gt_labels, batch_size=1, cuda=False):
+    print("**********************************Start training resnet*********************************")
     model, optimizer, lr_scheduler = getResNet(cuda=cuda)
     transform = Compose(
         [
@@ -115,11 +116,11 @@ def train_resnet(data, gt_labels, batch_size=1, cuda=False):
             model.train()
         if epoch >= 10:
             break
-        dataloader = DataLoaderX(dataset, batch_size=batch_size, shuffle=True, num_workers=1)
+        dataloader = DataLoaderX(dataset, batch_size=batch_size, shuffle=True, num_workers=1, collate_fn=collate_fn)
         iterator = tqdm(dataloader)
         for sample in iterator:
             optimizer.zero_grad()
-            img, gt_label, _ = sample
+            img, gt_label = sample
             if cuda:
                 img = Variable(img).cuda()
                 classification = model(img).cpu()

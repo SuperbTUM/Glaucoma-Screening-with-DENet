@@ -7,6 +7,7 @@ from torch.autograd import Variable
 import cv2
 from dataset import Refuge2, Resize2_640
 from torchvision.transforms import Compose
+import numpy as np
 
 
 def load_train_images():
@@ -15,13 +16,17 @@ def load_train_images():
         names = f.readlines()
         for name in names:
             name = name.strip('\n')
-            imgs_array.append(cv2.imread(name))
+            imgs_array.append(cv2.imread(name).transpose(2, 0, 1))
     f.close()
     return imgs_array
 
 
-def load_gt_labels():
-    return [1 for _ in range(40)] + [0 for _ in range(360)]
+def load_gt_labels(path='imgList.txt'):
+    if path == 'imgList.txt':
+        labels = [1 for _ in range(40)] + [0 for _ in range(360)]
+        return tuple(labels)
+    else:
+        raise NotImplementedError
 
 
 def load_segment_images():
@@ -41,7 +46,7 @@ def load_predict_imgs(path):
         names = f.readlines()
         for name in names:
             name = name.strip('\n')
-            imgs_array.append(cv2.imread(name))
+            imgs_array.append(cv2.imread(name).transpose(2, 0, 1))
     f.close()
     return imgs_array
 
@@ -54,7 +59,7 @@ def FullTrain(imgs, gt_labels, gt_segmentations, cuda=False):
     cropped_imgs = []
     for i in range(len(discs)):
         cropped_imgs.append(RegionCrop(imgs[i], discs[i]))
-    cropped_imgs = torch.stack(cropped_imgs)
+    cropped_imgs = np.stack(cropped_imgs)
     model_cropped = train_resnet(cropped_imgs, gt_labels, batch_size=10, cuda=cuda)
     # transformation
     polar_imgs = transformation(cropped_imgs)
@@ -78,7 +83,7 @@ def FullPredict(imgs, models, cuda=False):
         predict_fc = model_fc(img)
         predict_cropped = model_cropped(img)
         predict_polar = model_polar(img)
-        predict = (predict_global + predict_fc + predict_cropped + predict_polar) / 4
+        predict = (predict_global + predict_fc + predict_cropped + predict_polar) // 4
         predicts.append(predict)
     return predicts
 

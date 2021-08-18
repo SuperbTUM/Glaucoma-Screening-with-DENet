@@ -87,9 +87,9 @@ class LocalizationNet(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, in_channels=32):
+    def __init__(self):
         super().__init__()
-        self.encoder1 = Encoder(in_channels, out_channels=32, num_encoder=1)
+        self.encoder1 = Encoder(in_channels=3, out_channels=32, num_encoder=1)
         self.encoder2 = Encoder(in_channels=32, out_channels=64, num_encoder=2)
         self.encoder3 = Encoder(in_channels=64, out_channels=128, num_encoder=2)
         self.encoder4 = Encoder(in_channels=128, out_channels=256, num_encoder=2)

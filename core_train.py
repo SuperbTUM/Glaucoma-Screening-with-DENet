@@ -3,16 +3,15 @@ from UNet import UNet
 from pathlib import Path
 from torch import optim
 from dataset import Refuge2, Resize2_640, RandomRotation, RandomFlip
-from torch.utils.data import DataLoader
 from tqdm import tqdm
 from torch.autograd import Variable
 import torch.nn as nn
 from utils import DiceLoss
 from torchvision.transforms import Compose
-from utils import counting_correct, DataLoaderX
+from utils import counting_correct, DataLoaderX, collate_fn
 
 
-def load_model(base_lr=1e-3, pretrained=None, cuda=False):
+def load_model(base_lr=1e-4, pretrained=None, cuda=False):
     model = UNet()
     if cuda:
         model = model.cuda()
@@ -25,18 +24,19 @@ def load_model(base_lr=1e-3, pretrained=None, cuda=False):
                 states = torch.load(f)
             model.load_state_dict(states)
             model.eval()
+        f.close()
     optimizer = optim.SGD(model.parameters(), lr=base_lr, momentum=0.9, weight_decay=0.0001)
     lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30)
     return model, optimizer, lr_scheduler
 
 
-def test(data, model, cuda):
-    dataloader = DataLoaderX(data, shuffle=False, num_workers=1)
+def test(data, model, batch_size, cuda):
+    dataloader = DataLoaderX(data, batch_size=batch_size, shuffle=False, num_workers=1, collate_fn=collate_fn)
     iterator = tqdm(dataloader)
     correct = 0
     res = []
     for sample in iterator:
-        img, gt_label, gt_segmentation = sample
+        img, gt_segmentation = sample
         if cuda:
             img = Variable(img).cuda
         localization = model(img)
@@ -46,6 +46,7 @@ def test(data, model, cuda):
 
 
 def core_train(data, gt_segmentations, batch_size=1, cuda=False):
+    print("*******************************Start training disc segmentation******************************")
     transform = Compose(
         [
             RandomRotation(),
@@ -59,19 +60,21 @@ def core_train(data, gt_segmentations, batch_size=1, cuda=False):
     train_dataset = Refuge2(data=data, labels=None, segmentations=gt_segmentations,
                             transform=transform)
     res = None
+    print("*********************************Data loading completed*******************************")
     while True:
         if epoch > 0 and epoch % 2 == 0:
             model.eval()
-            PA, res = test(train_dataset, model, cuda=cuda)
+            PA, res = test(train_dataset, model, batch_size=batch_size, cuda=cuda)
             best_PA = max(best_PA, PA)
             print('Best PA: {}'.format(best_PA))
             model.train()
         if epoch >= 10:
             break
-        dataloader = DataLoaderX(train_dataset, batch_size=batch_size, shuffle=True, num_workers=1)
+        dataloader = DataLoaderX(train_dataset, batch_size=batch_size, shuffle=True, num_workers=1,
+                                 collate_fn=collate_fn)
         iterator = tqdm(dataloader)
         for sample in iterator:
-            img, gt_label, gt_segmentation = sample
+            img, gt_segmentation = sample
             optimizer.zero_grad()
             if cuda:
                 img = Variable(img).cuda()
@@ -85,4 +88,5 @@ def core_train(data, gt_segmentations, batch_size=1, cuda=False):
             optimizer.step()
             lr_scheduler.step()
             epoch += 1
+    print("************************************Segmentation result obtained***********************************")
     return res
