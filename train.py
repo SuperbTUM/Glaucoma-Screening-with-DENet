@@ -21,8 +21,8 @@ def getModel(base_lr=1e-4, cuda=False):
     return model, optimizer, lr_scheduler
 
 
-def getResNet(base_lr=1e-4, cuda=False):
-    model = ResNet50_Mod()
+def getResNet(size, base_lr=1e-4, cuda=False):
+    model = ResNet50_Mod(input_size=size)
     if cuda:
         model = model.cuda()
     optimizer = optim.SGD(model.parameters(), lr=base_lr, momentum=0.9, weight_decay=0.0001)
@@ -98,7 +98,7 @@ def train_fcnet(data, gt_labels, gt_segmentations, batch_size=1, cuda=False):
 
 def train_resnet(data, gt_labels, batch_size=1, cuda=False):
     print("**********************************Start training resnet*********************************")
-    model, optimizer, lr_scheduler = getResNet(cuda=cuda)
+    model, optimizer, lr_scheduler = getResNet(size=data.shape[1], cuda=cuda)
     transform = Compose(
         [
             RandomRotation(),

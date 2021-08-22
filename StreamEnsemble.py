@@ -18,7 +18,7 @@ def load_train_images():
             name = name.strip('\n')
             imgs_array.append(cv2.imread(name).transpose(2, 0, 1))
     f.close()
-    return imgs_array
+    return np.array(imgs_array)
 
 
 def load_gt_labels(path='imgList.txt'):
@@ -37,7 +37,7 @@ def load_segment_images():
             name = name.strip('\n')
             imgs_array.append(cv2.imread(name, 0))
     f.close()
-    return imgs_array
+    return np.array(imgs_array)
 
 
 def load_predict_imgs(path):
@@ -48,7 +48,7 @@ def load_predict_imgs(path):
             name = name.strip('\n')
             imgs_array.append(cv2.imread(name).transpose(2, 0, 1))
     f.close()
-    return imgs_array
+    return np.array(imgs_array)
 
 
 def FullTrain(imgs, gt_labels, gt_segmentations, cuda=False):
