@@ -55,7 +55,7 @@ def core_train(data, gt_segmentations, batch_size=1, cuda=False):
         ]
     )
     epoch = 0
-    best_PA = 0.
+    best_dsc = 0.
     model, optimizer, lr_scheduler = load_model(cuda=cuda)
     train_dataset = Refuge2(data=data, labels=None, segmentations=gt_segmentations,
                             transform=transform)
@@ -64,9 +64,9 @@ def core_train(data, gt_segmentations, batch_size=1, cuda=False):
     while True:
         if epoch > 0 and epoch % 2 == 0:
             model.eval()
-            PA, res = test(train_dataset, model, batch_size=batch_size, cuda=cuda)
-            best_PA = max(best_PA, PA)
-            print('Best PA: {}'.format(best_PA))
+            dsc, res = test(train_dataset, model, batch_size=batch_size, cuda=cuda)
+            best_dsc = max(best_dsc, dsc)
+            print('Best dsc: {}'.format(best_dsc))
             model.train()
         if epoch >= 10:
             break
@@ -81,8 +81,7 @@ def core_train(data, gt_segmentations, batch_size=1, cuda=False):
                 localization = model(img).cpu
             else:
                 localization = model(img)
-            loss_segmentation = DiceLoss(localization.view(localization.shape[0], -1), gt_segmentation.view(
-                gt_segmentation.shape[0], -1))
+            loss_segmentation = DiceLoss(localization, gt_segmentation)
             loss_segmentation.backward()
             nn.utils.clip_grad_norm_(model.parameters(), 10.0)
             optimizer.step()

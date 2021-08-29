@@ -7,28 +7,37 @@ class ConvPac(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
         self.Conv = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
+        self.bn = nn.BatchNorm2d(out_channels)
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         x = self.Conv(x)
+        x = self.bn(x)
         x = self.relu(x)
         return x
 
 
 class ResidualBlockSE(nn.Module):
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, SE=True):
         super(ResidualBlockSE, self).__init__()
         self.conv1 = ConvPac(in_channels=in_channels, out_channels=out_channels)
         self.conv2 = nn.Conv2d(in_channels=out_channels, out_channels=out_channels, kernel_size=3, padding=1)
         self.skipconnect = nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1)
-        self.se_block = SEBlock(out_channels)
+        self.se_block = SEBlock(out_channels) if SE else None
+        self.bn = nn.BatchNorm2d(out_channels)
+        self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         skipconnect = self.skipconnect(x)
         x = self.conv1(x)
         x = self.conv2(x)
-        scale = self.se_block(x)
-        x += skipconnect * scale
+        if self.se_block:
+            scale = self.se_block(x)
+            x += skipconnect * scale
+        else:
+            x += skipconnect
+        x = self.bn(x)
+        x = self.relu(x)
         return x
 
 
@@ -36,10 +45,13 @@ class SEBlock(nn.Module):
     def __init__(self, in_channels):
         super(SEBlock, self).__init__()
         self.avepool = nn.AdaptiveAvgPool2d(1)
-        self.fc1 = nn.Linear(in_channels, in_channels // 16)
+        self.fc1 = nn.Linear(in_channels, in_channels // 16, bias=False)
         self.relu = nn.ReLU(inplace=True)
-        self.fc2 = nn.Linear(in_channels // 16, in_channels)
+        self.fc2 = nn.Linear(in_channels // 16, in_channels, bias=False)
         self.sigmoid = nn.Sigmoid()
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight.data)
 
     def forward(self, x):
         x = self.avepool(x)
@@ -80,12 +92,16 @@ class Decoder(nn.Module):
         super().__init__()
         self.Conv1 = ConvPac(in_channels, in_channels // 2)
         self.Conv2 = ConvPac(in_channels // 2, out_channels)
-        self.Conv3 = ResidualBlockSE(out_channels, out_channels)
+        self.Conv3 = ResidualBlockSE(out_channels, out_channels, SE=False)
+        self.bn = nn.BatchNorm2d(out_channels)
+        self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         x = self.Conv1(x)
         x = self.Conv2(x)
         x = self.Conv3(x)
+        x = self.bn(x)
+        x = self.relu(x)
         return x
 
 

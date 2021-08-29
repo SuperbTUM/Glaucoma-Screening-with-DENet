@@ -7,19 +7,41 @@ from prefetch_generator import BackgroundGenerator
 from torch.utils.data import DataLoader
 
 
-def DiceLoss(predict, gt, thresholdG=200, reduction='mean'):
-    predict = predict.squeeze(dim=1)
-    gt = gt.squeeze(dim=1)
+def smoothLoss(predict, gt, reduction='mean'):
+    H, W = predict.shape[2:]
+    loss = torch.abs(predict[:, :, 1:H - 1, 1:W - 1] - predict[:, :, 0:H - 2, 1:W - 1]) + \
+           torch.abs(predict[:, :, 1:H - 1, 1:W - 1] - predict[:, :, 2:H, 1:W - 1]) + \
+           torch.abs(predict[:, :, 1:H - 1, 1:W - 1] - predict[:, :, 1:H - 1, 0:W - 2]) + \
+           torch.abs(predict[:, :, 1:H - 1, 1:W - 1] - predict[:, :, 1:H - 1, 2:W])
+    M1 = torch.eq(gt[:, :, 1:H-1, 1:W-1], gt[:, :, 0:H-2, 1:W-1]).float()
+    M2 = torch.eq(gt[:, :, 1:H-1, 1:W-1], gt[:, :, 2:H, 1:W-1]).float()
+    M3 = torch.eq(gt[:, :, 1:H-1, 1:W-1], gt[:, :, 1:H-1, 0:W-2]).float()
+    M4 = torch.eq(gt[:, :, 1:H-1, 1:W-1], gt[:, :, 1:H-1, 2:W]).float()
+    mask = M1 * M2 * M3 * M4
+    if reduction == 'mean':
+        return (loss * mask).mean()
+    else:
+        return (loss * mask).sum()
+
+
+def DiceLoss(predict, gt, thresholdG=200, epsilon=1e-8, reduction='mean'):
+    predict = predict.view(predict.shape[0], -1)
+    gt = gt.view(gt.shape[0], -1)
     gt = torch.where(gt < thresholdG, 1, 0)
     cross_prod = predict * gt
-    cross_prod = cross_prod.sum(dim=(1, 2))
-    self_prod = (predict * predict).sum(dim=(1, 2)) + (gt * gt).sum(dim=(1, 2))
+    cross_prod = cross_prod.sum(dim=-1)
+    self_prod = (predict * predict).sum(dim=-1) + (gt * gt).sum(dim=-1) + epsilon
     if reduction == 'mean':
         return (1 - 2 * cross_prod / self_prod).mean()
     elif reduction == 'sum':
         return (1 - 2 * cross_prod / self_prod).sum()
     else:
         raise NotImplementedError
+
+
+def DiceSmoothLoss(predict, gt, lambda1=0.4, lambda2=1., thresholdG=200, epsilon=1e-8, reduction='mean'):
+    return lambda1 * DiceLoss(predict, gt, thresholdG, epsilon, reduction) + \
+           lambda2 * smoothLoss(predict, gt)
 
 
 def DSC(predict, gt, thresholdP=0.5, thresholdG=200):  # If the background is white
@@ -111,6 +133,6 @@ def collate_fn(batch):
 
 
 if __name__ == "__main__":
-    a = [[3, 1], [2, 4]]
-    a = torch.Tensor(a)
-    a.detach().numpy()
+    a = torch.ones((10, 1, 10, 10))
+    b = torch.ones((10, 1, 10, 10))
+    print(DiceSmoothLoss(a, b))
