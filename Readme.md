@@ -2,11 +2,11 @@
 
 ### Introduction
 
-This work is a re-implementation of previous work [Disc-aware Ensemble Network for Glaucoma Screening from Fundus Image, 2018](https://arxiv.org/pdf/1805.07549.pdf). Project [website](https://hzfu.github.io/proj_glaucoma_fundus.html) shows the development team's work. If you have a brief glance at the source code shown on the Github, you may find a minor difference on the U-Net architecture. This is because the author wish to integrate his another work [MNet](https://arxiv.org/abs/1801.00926) into this paper. The major optimization considers decoders of all levels in U-Net as valid segmentation outputs with equal weight.
+This work is a combination of previous works [Disc-aware Ensemble Network for Glaucoma Screening from Fundus Image, 2018](https://arxiv.org/pdf/1805.07549.pdf), [Joint Optic Disc and Cup Segmentation Based on Multi-label Deep Network and Polar Transformation, 2018](https://arxiv.org/abs/1801.00926), [Detection of Pathological Myopia and Optic Disc Segmentation with Deep Convolutional Neural Networks, 2019](https://ieeexplore.ieee.org/document/8929252) and [Squeeze-and-Excitation Networks](https://arxiv.org/abs/1709.01507). Project [website](https://hzfu.github.io/proj_glaucoma_fundus.html) shows the development team's work for the first two papers. The third and fourth paper help to improve the segmentation network.
 
 ### Dataset
 
-Dataset comes from the newer version of Refuge Challenge -- [Refuge2 2020](https://refuge.grand-challenge.org/Home2020/).  Either the older version or the newer version possesses a full set of medical eye images. Sample raw image and segmented image are shown in the sample folder.
+Dataset comes from the newer version of Refuge Challenge -- [Refuge2 2020](https://refuge.grand-challenge.org/Home2020/).  Either the older version or the newer version possesses a full set of medical eye images. Sample raw image and segmented image are shown in the sample folder. The ORIGA dataset may no longer available for download because I am unable to do that at present.
 
 ### Code Info
 
@@ -14,6 +14,7 @@ Codes were reproduced with no tricks in the naive version. The starting point li
 
 I set `batch_size = 1` in segmentation training on purpose. Be careful when you intend to set it to another value because I used `torch.squeeze`.
 
-### Paper Review
+### Implementation Details
 
-Undoubtedly this is an excellent paper filled with avant-guard ideas, at least by the time of publication. But truth to be told, personally, this paper is no longer useful since it has so many restrictions. First of all, the origin ORIGA dataset that the network was pretrained on is a small one, therefore the author resized the images to 640 * 640. With the flourishment of graphics industry, this network is incompatible with big and high-resolution images. Secondly, the network is a bit clumsy with four classification branches, though the prediction speed is 2 FPS on a single commercial GPU. I believe the state-of-the-art works could easily prevent this issue. Last but least, there are two branches that heavily rely on segmentation results. This may have an unavoidable negative impact on the classification results.
+The biggest drawback is the immutable image size in the segmentation network. The modified segmentation network can be viewed as a mixture of UNet, residual block and squeeze-and-excitation block. Inspired by [Patch-Based Output Space Adversarial Learning
+for Joint Optic Disc and Cup Segmentation](https://arxiv.org/abs/1902.07519), we can enrich the loss function by adding smooth loss. The classification network is ResNet50. I have not figured out a way of improving classification network. An updated version will be released if any significant progress is made.

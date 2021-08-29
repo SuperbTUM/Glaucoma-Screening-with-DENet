@@ -8,7 +8,7 @@ from torch.autograd import Variable
 import torch.nn as nn
 from utils import DiceLoss
 from torchvision.transforms import Compose
-from utils import counting_correct, DataLoaderX, collate_fn
+from utils import DSC, DataLoaderX, collate_fn
 
 
 def load_model(base_lr=1e-4, pretrained=None, cuda=False):
@@ -33,16 +33,16 @@ def load_model(base_lr=1e-4, pretrained=None, cuda=False):
 def test(data, model, batch_size, cuda):
     dataloader = DataLoaderX(data, batch_size=batch_size, shuffle=False, num_workers=1, collate_fn=collate_fn)
     iterator = tqdm(dataloader)
-    correct = 0
+    dsc_list = list()
     res = []
     for sample in iterator:
         img, gt_segmentation = sample
         if cuda:
             img = Variable(img).cuda
         localization = model(img)
-        res.append(localization.squeeze().detach().numpy())
-        correct += counting_correct(localization, gt_segmentation)
-    return correct / (640**2), res
+        res.append(localization)
+        dsc_list.append(DSC(localization, gt_segmentation))
+    return sum(dsc_list) / len(dsc_list), res
 
 
 def core_train(data, gt_segmentations, batch_size=1, cuda=False):

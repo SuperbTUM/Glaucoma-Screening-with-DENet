@@ -7,19 +7,36 @@ from prefetch_generator import BackgroundGenerator
 from torch.utils.data import DataLoader
 
 
-def DiceLoss(predict, gt):
+def DiceLoss(predict, gt, thresholdG=200, reduction='mean'):
+    predict = predict.squeeze(dim=1)
+    gt = gt.squeeze(dim=1)
+    gt = torch.where(gt < thresholdG, 1, 0)
     cross_prod = predict * gt
-    cross_prod = cross_prod.sum(dim=1)
-    self_prod = (predict * predict).sum(dim=1) + (gt * gt).sum(dim=1)
-    return 1 - 2 * cross_prod / self_prod
+    cross_prod = cross_prod.sum(dim=(1, 2))
+    self_prod = (predict * predict).sum(dim=(1, 2)) + (gt * gt).sum(dim=(1, 2))
+    if reduction == 'mean':
+        return (1 - 2 * cross_prod / self_prod).mean()
+    elif reduction == 'sum':
+        return (1 - 2 * cross_prod / self_prod).sum()
+    else:
+        raise NotImplementedError
 
 
-def counting_correct(predict, gt, threshold=0.5):
-    predict = predict.view(predict.shape[0], -1)
-    gt = gt.view(gt.shape[0], -1)
-    is_equal = torch.eq(predict > threshold, gt < 200)  # if the background is white
-    is_equal = is_equal.detach().numpy()
-    return np.count_nonzero(is_equal)
+def DSC(predict, gt, thresholdP=0.5, thresholdG=200):  # If the background is white
+    predict = predict.flatten()
+    predict = torch.where(predict > thresholdP, 1, 0)
+    gt = gt.flatten()
+    gt = torch.where(gt < thresholdG, 1, 0)
+    TP = FN = FP = 0
+    pairs = list(zip(gt, predict))
+    for gt_pixel, pred_pixel in pairs:
+        if gt_pixel and pred_pixel:
+            TP += 1
+        elif (gt_pixel or pred_pixel) == 0:
+            FN += 1
+        elif gt_pixel == 0 and pred_pixel == 1:
+            FP += 1
+    return 2 * TP / (2 * TP + FN + FP)
 
 
 def RegionCrop(origin_img, localization, threshold=0.5, size=(224, 224)):

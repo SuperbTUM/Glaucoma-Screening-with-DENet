@@ -9,6 +9,8 @@ from torch.autograd import Variable
 import torch.nn as nn
 from dedicated_Resnet50 import ResNet50_Mod
 from utils import DataLoaderX, collate_fn
+from sklearn.metrics import roc_auc_score
+import numpy as np
 
 
 def getModel(base_lr=1e-4, cuda=False):
@@ -33,27 +35,18 @@ def getResNet(size, base_lr=1e-4, cuda=False):
 def test(data, model, batch_size, cuda):
     dataloader = DataLoaderX(data, batch_size=batch_size, shuffle=False, num_workers=1, collate_fn=collate_fn)
     iterator = tqdm(dataloader)
-    TP = FP = TN = FN = 0.
+    classification = list()
+    gts = list()
     for sample in iterator:
         img, gt_label = sample
         if cuda:
             img = Variable(img).cuda
-        classification = model(img)
-        for i in range(classification.shape[0]):
-            if gt_label[i] == 1:
-                if classification[i] == 1:
-                    TP += 1
-                else:
-                    TN += 1
-            else:
-                if classification[i] == 1:
-                    FP += 1
-                else:
-                    FN += 1
-    Sen = TP / (TP + FN)
-    Spe = TN / (TN + FP)
-    BAcc = (Sen + Spe) / 2
-    return BAcc
+        classification.append(model(img).cpu().detach().numpy())
+        gts.append(gt_label.numpy())
+    classification = np.stack(classification).flatten()
+    gts = np.stack(gts).flatten()
+    auc = roc_auc_score(classification, gts, average=None)
+    return auc
 
 
 def train_fcnet(data, gt_labels, gt_segmentations, batch_size=1, cuda=False):
@@ -68,12 +61,12 @@ def train_fcnet(data, gt_labels, gt_segmentations, batch_size=1, cuda=False):
     )
     dataset = Refuge2(data, gt_labels, None, transform=transform)
     epoch = 0
-    best_BAcc = 0.
+    best_auc = 0.
     while True:
         if epoch > 0 and epoch % 2 == 0:
             model.eval()
-            BAcc = test(dataset, model, batch_size, cuda)
-            best_BAcc = max(best_BAcc, BAcc)
+            auc = test(dataset, model, batch_size, cuda)
+            best_auc = max(best_auc, auc)
             model.train()
         if epoch >= 10:
             break
@@ -107,12 +100,12 @@ def train_resnet(data, gt_labels, batch_size=1, cuda=False):
     )
     dataset = Refuge2(data, gt_labels, segmentations=None, transform=transform)
     epoch = 0
-    best_BAcc = 0.
+    best_auc = 0.
     while True:
         if epoch > 0 and epoch % 2 == 0:
             model.eval()
-            BAcc = test(dataset, model, batch_size=batch_size, cuda=cuda)
-            best_BAcc = max(best_BAcc, BAcc)
+            auc = test(dataset, model, batch_size=batch_size, cuda=cuda)
+            best_auc = max(best_auc, auc)
             model.train()
         if epoch >= 10:
             break
@@ -136,6 +129,9 @@ def train_resnet(data, gt_labels, batch_size=1, cuda=False):
 
 
 if __name__ == "__main__":
-    a = torch.ones((10, 1))
-    if a[0] == 1.:
-        print('True')
+    a = [0 for _ in range(10)]
+    a = torch.Tensor(a)
+    a = a.numpy()
+    b = [a, a]
+    b = np.stack(b).flatten()
+    print(b.shape)

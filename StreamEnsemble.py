@@ -51,6 +51,26 @@ def load_predict_imgs(path):
     return np.array(imgs_array)
 
 
+def Performance(predict, gt):
+    predict = predict.flatten()
+    gt = gt.flatten()
+    TP = TN = FP = FN = 0
+    new_zip = list(zip(gt, predict))
+    for gt_label, predict_label in new_zip:
+        if gt_label == 1 and predict_label == 1:
+            TP += 1
+        elif gt_label == 1 and predict_label == 0:
+            TN += 1
+        elif gt_label == 0 and predict_label == 1:
+            FP += 1
+        else:
+            FN += 1
+    Sen = TP / (TP + FN)
+    Spe = TN / (TN + FP)
+    BAcc = (Sen + Spe) / 2
+    return Sen, Spe, BAcc
+
+
 def FullTrain(imgs, gt_labels, gt_segmentations, cuda=False):
     # global image
     model_global = train_resnet(imgs, gt_labels, batch_size=10, cuda=cuda)
