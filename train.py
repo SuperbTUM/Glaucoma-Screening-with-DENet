@@ -80,7 +80,8 @@ def train_fcnet(data, gt_labels, gt_segmentations, batch_size=1, cuda=False):
                 classification = model(img).cpu()
             else:
                 classification = model(img)
-            loss = nn.BCELoss()(classification.view(classification.shape[0], -1), gt_label.view(gt_label.shape[0], -1))
+            # loss = nn.BCELoss()(classification.view(classification.shape[0], -1), gt_label.view(gt_label.shape[0], -1))
+            loss = nn.L1Loss()(classification.view(classification.shape[0], -1), gt_label.view(gt_label.shape[0], -1))
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), 10.0)
             optimizer.step()

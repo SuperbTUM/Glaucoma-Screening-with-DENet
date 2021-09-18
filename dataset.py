@@ -25,8 +25,7 @@ class Resize2_640(object):
             bottom = self.size[0] - adjust_size[0] - top
             left = (self.size[1] - adjust_size[1]) // 2
             right = self.size[1] - adjust_size[1] - left
-            resized_image_with_ratio = cv2.copyMakeBorder(img_with_ratio, top, bottom, left, right, cv2.BORDER_CONSTANT,
-                                                          [0, 0, 0])
+            resized_image_with_ratio = cv2.copyMakeBorder(img_with_ratio, top, bottom, left, right, cv2.BORDER_REFLECT)
             img_list.append(resized_image_with_ratio.transpose(2, 0, 1))
         return img_list
 
