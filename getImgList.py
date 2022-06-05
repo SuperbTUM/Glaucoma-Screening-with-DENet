@@ -1,33 +1,23 @@
 import os
+import glob
+"""
+under your file directory, there are two sub-directories: Glaucoma and Non-Glaucoma
+"""
 
 
 def file_name_walk(file_dir):
     with open("imgList.txt", "w") as f:
-        for root, dirs, files in os.walk(file_dir):
-            if dirs:
-                for dir in dirs:
-                    for file in files:
-                        if '.jpg' in file:
-                            f.write(root+dir+'\\' + file+'\n')
-            else:
-                for file in files:
-                    if '.jpg' in file:
-                        f.write(root+'\\'+file+'\n')
+        files = sorted(glob.glob(file_dir + "/*/*.jpg"))
+        files = list(map(lambda x: x+"\n", files))
+        f.writelines(files)
         f.close()
 
 
 def another_file_name_walk(file_dir):
     with open("segList.txt", "w") as f:
-        for root, dirs, files in os.walk(file_dir):
-            if dirs:
-                for dir in dirs:
-                    for file in files:
-                        if '.jpg' in file:
-                            f.write(root+dir+'\\'+file+'\n')
-            else:
-                for file in files:
-                    if '.bmp' in file:
-                        f.write(root+'\\'+file+'\n')
+        files = sorted(glob.glob(file_dir + "/*/*.bmp"))
+        files = list(map(lambda x: x + "\n", files))
+        f.writelines(files)
         f.close()
 
 
